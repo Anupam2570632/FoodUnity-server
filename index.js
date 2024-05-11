@@ -27,6 +27,7 @@ async function run() {
         // Send a ping to confirm a successful connection
 
         const foodCollection = client.db('foodUnity').collection('foods');
+        const requestCollection = client.db('foodUnity').collection('requestedFood')
 
         app.get('/foods', async (req, res) => {
             const result = await foodCollection.find().toArray()
@@ -42,8 +43,27 @@ async function run() {
 
         app.post('/foods', async (req, res) => {
             const food = req.body;
-            console.log(food)
             const result = await foodCollection.insertOne(food);
+            res.send(result)
+        })
+
+        app.post('/requestedFoods', async (req, res) => {
+            const food = req.body;
+            const result = await requestCollection.insertOne(food)
+            res.send(result)
+        })
+
+        app.patch('/foods', async (req, res) => {
+            const updatedData = req.body;
+            const id = updatedData.id;
+            const filter = { _id: new ObjectId(id) }
+
+            const food = {
+                $set: {
+                    foodStatus: 'Not available'
+                }
+            }
+            const result = await foodCollection.updateOne(filter, food)
             res.send(result)
         })
 
