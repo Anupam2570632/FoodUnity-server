@@ -15,8 +15,24 @@ app.use(cookieParser())
 
 // middle were
 const logger = async (req, res, next) => {
-    console.log('called', req.host, req.originalUrl)
+    console.log('called', req.hostname, req.originalUrl)
     next()
+}
+
+const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.token;
+    if (!token) {
+        return res.status(404).send({ message: 'Not Authorized' })
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            console.log(err)
+            return res.status(401).send({ message: 'Unauthorized' })
+        }
+        console.log('value in token', decoded)
+        req.user = decoded;
+        next()
+    })
 }
 
 
@@ -42,9 +58,9 @@ async function run() {
         const foodCollection = client.db('foodUnity').collection('foods');
         const requestCollection = client.db('foodUnity').collection('requestedFood')
 
-        app.post('/jwt',logger, async (req, res) => {
+        app.post('/jwt', logger, async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10h' })
             res.
                 cookie('token', token, {
                     httpOnly: true,
@@ -53,39 +69,51 @@ async function run() {
         })
 
 
+        app.post('/logout', async (req, res) => {
+            const user = req.body;
+            console.log('logout user', user)
+            res.clearCookie('token', { maxAge: 0 }).send({ success: true })
+        })
 
-        app.get('/foods',logger, async (req, res) => {
+
+
+        app.get('/foods', logger, async (req, res) => {
             const result = await foodCollection.find().toArray()
             res.send(result);
         })
 
-        app.get('/food/:id',logger, async (req, res) => {
+        app.get('/food/:id', logger, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await foodCollection.findOne(query)
             res.send(result)
         })
 
-        app.post('/foods',logger, async (req, res) => {
+        app.post('/foods', logger, async (req, res) => {
             const food = req.body;
             const result = await foodCollection.insertOne(food);
             res.send(result)
         })
 
-        app.post('/requestedFoods',logger, async (req, res) => {
+        app.post('/requestedFoods', logger, async (req, res) => {
             const food = req.body;
             const result = await requestCollection.insertOne(food)
             res.send(result)
         })
 
-        app.get('/requestedFood',logger, async (req, res) => {
+        app.get('/requestedFood', logger, verifyToken, async (req, res) => {
             const email = req.query.email;
+            console.log(req.query.email, req.user.userEmail)
+
+            if (req.query.email !== req.user.userEmail) {
+                return res.status(403).send({ message: 'forbidden' })
+            }
             const query = { userEmail: email }
             const result = await requestCollection.find(query).toArray()
             res.send(result)
         })
 
-        app.patch('/foods',logger, async (req, res) => {
+        app.patch('/foods', logger, async (req, res) => {
             const updatedData = req.body;
             const id = updatedData.id;
             const filter = { _id: new ObjectId(id) }
@@ -99,8 +127,13 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/food',logger, async (req, res) => {
+        app.get('/food', logger, verifyToken, async (req, res) => {
             const email = req.query.email;
+            console.log(req.query.email, req.user.userEmail)
+
+            if (req.query.email !== req.user.userEmail) {
+                return res.status(403).send({ message: 'forbidden' })
+            }
             const query = { donarEmail: email }
             const result = await foodCollection.find(query).toArray()
             res.send(result)
