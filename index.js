@@ -1,10 +1,14 @@
 const express = require('express')
 const cors = require('cors')
+const jwt = require('jsonwebtoken')
 require('dotenv').config()
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors())
+app.use(cors({
+    origin: ['http://localhost:5173'],
+    credentials: true
+}))
 app.use(express.json())
 
 
@@ -28,6 +32,13 @@ async function run() {
 
         const foodCollection = client.db('foodUnity').collection('foods');
         const requestCollection = client.db('foodUnity').collection('requestedFood')
+
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, 'secret', { expiresIn: '1h' })
+        })
+
+
 
         app.get('/foods', async (req, res) => {
             const result = await foodCollection.find().toArray()
@@ -53,6 +64,13 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/requestedFood', async (req, res) => {
+            const email = req.query.email;
+            const query = { userEmail: email }
+            const result = await requestCollection.find(query).toArray()
+            res.send(result)
+        })
+
         app.patch('/foods', async (req, res) => {
             const updatedData = req.body;
             const id = updatedData.id;
@@ -60,7 +78,7 @@ async function run() {
 
             const food = {
                 $set: {
-                    foodStatus: 'Not available'
+                    foodStatus: 'requested'
                 }
             }
             const result = await foodCollection.updateOne(filter, food)
