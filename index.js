@@ -1,6 +1,7 @@
 const express = require('express')
 const cors = require('cors')
 const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser')
 require('dotenv').config()
 const app = express();
 const port = process.env.PORT || 5000;
@@ -10,6 +11,14 @@ app.use(cors({
     credentials: true
 }))
 app.use(express.json())
+app.use(cookieParser())
+
+// middle were
+const logger = async (req, res, next) => {
+    console.log('called', req.host, req.originalUrl)
+    next()
+}
+
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -33,7 +42,7 @@ async function run() {
         const foodCollection = client.db('foodUnity').collection('foods');
         const requestCollection = client.db('foodUnity').collection('requestedFood')
 
-        app.post('/jwt', async (req, res) => {
+        app.post('/jwt',logger, async (req, res) => {
             const user = req.body;
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
             res.
@@ -45,38 +54,38 @@ async function run() {
 
 
 
-        app.get('/foods', async (req, res) => {
+        app.get('/foods',logger, async (req, res) => {
             const result = await foodCollection.find().toArray()
             res.send(result);
         })
 
-        app.get('/food/:id', async (req, res) => {
+        app.get('/food/:id',logger, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await foodCollection.findOne(query)
             res.send(result)
         })
 
-        app.post('/foods', async (req, res) => {
+        app.post('/foods',logger, async (req, res) => {
             const food = req.body;
             const result = await foodCollection.insertOne(food);
             res.send(result)
         })
 
-        app.post('/requestedFoods', async (req, res) => {
+        app.post('/requestedFoods',logger, async (req, res) => {
             const food = req.body;
             const result = await requestCollection.insertOne(food)
             res.send(result)
         })
 
-        app.get('/requestedFood', async (req, res) => {
+        app.get('/requestedFood',logger, async (req, res) => {
             const email = req.query.email;
             const query = { userEmail: email }
             const result = await requestCollection.find(query).toArray()
             res.send(result)
         })
 
-        app.patch('/foods', async (req, res) => {
+        app.patch('/foods',logger, async (req, res) => {
             const updatedData = req.body;
             const id = updatedData.id;
             const filter = { _id: new ObjectId(id) }
@@ -90,7 +99,7 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/food', async (req, res) => {
+        app.get('/food',logger, async (req, res) => {
             const email = req.query.email;
             const query = { donarEmail: email }
             const result = await foodCollection.find(query).toArray()
