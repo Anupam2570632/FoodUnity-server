@@ -29,7 +29,6 @@ const verifyToken = async (req, res, next) => {
             console.log(err)
             return res.status(401).send({ message: 'Unauthorized' })
         }
-        console.log('value in token', decoded)
         req.user = decoded;
         next()
     })
@@ -60,7 +59,7 @@ async function run() {
 
         app.post('/jwt', logger, async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '10h' })
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
             res.
                 cookie('token', token, {
                     httpOnly: true,
@@ -71,15 +70,21 @@ async function run() {
 
         app.post('/logout', async (req, res) => {
             const user = req.body;
-            console.log('logout user', user)
             res.clearCookie('token', { maxAge: 0 }).send({ success: true })
         })
-
 
 
         app.get('/foods', logger, async (req, res) => {
             const result = await foodCollection.find().toArray()
             res.send(result);
+        })
+
+        app.delete('/foods', logger, async (req, res) => {
+            const id = req.query.id;
+            console.log(id)
+            const query = { _id: new ObjectId(id) }
+            const result = await foodCollection.deleteOne(query)
+            res.send(result)
         })
 
         app.get('/food/:id', logger, async (req, res) => {
@@ -103,7 +108,6 @@ async function run() {
 
         app.get('/requestedFood', logger, verifyToken, async (req, res) => {
             const email = req.query.email;
-            console.log(req.query.email, req.user.userEmail)
 
             if (req.query.email !== req.user.userEmail) {
                 return res.status(403).send({ message: 'forbidden' })
