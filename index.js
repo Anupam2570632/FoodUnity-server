@@ -7,13 +7,22 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors({
-    origin: ['http://localhost:5173'],
+    origin: [
+        'https://food-unity-web.netlify.app'
+    ],
     credentials: true
 }))
 app.use(express.json())
 app.use(cookieParser())
 
 // middle were
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
+
+
 const logger = async (req, res, next) => {
     console.log('called', req.hostname, req.originalUrl)
     next()
@@ -59,18 +68,15 @@ async function run() {
 
         app.post('/jwt', logger, async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            const token =  jwt.sign(user, process.env.ACCESS_TOKEN_SECRET)
             res.
-                cookie('token', token, {
-                    httpOnly: true,
-                    secure: false
-                }).send({ success: true })
+                cookie('token', token, cookieOptions).send({ success: true })
         })
 
 
         app.post('/logout', async (req, res) => {
             const user = req.body;
-            res.clearCookie('token', { maxAge: 0 }).send({ success: true })
+            res.clearCookie('token', { ...cookieOptions, maxAge: 0 }).send({ success: true })
         })
 
 
@@ -79,9 +85,31 @@ async function run() {
             res.send(result);
         })
 
+        app.put('/foods', logger, async (req, res) => {
+            const food = req.body;
+            const id = food.id;
+            const { foodName, foodImage, expiredDate, additionalNotes, donarName, donarImage, pickupLocation, donarEmail, foodQuantity, foodStatus } = food;
+            const updateDoc = {
+                $set: {
+                    foodName: foodName,
+                    foodImage: foodImage,
+                    expiredDate: expiredDate,
+                    additionalNotes: additionalNotes,
+                    donarName: donarName,
+                    donarImage: donarImage,
+                    pickupLocation: pickupLocation,
+                    donarEmail: donarEmail,
+                    foodQuantity: foodQuantity,
+                    foodStatus: foodStatus,
+                },
+            };
+            const filter = { _id: new ObjectId(id) };
+            const result = await foodCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+
         app.delete('/foods', logger, async (req, res) => {
             const id = req.query.id;
-            console.log(id)
             const query = { _id: new ObjectId(id) }
             const result = await foodCollection.deleteOne(query)
             res.send(result)
@@ -100,7 +128,7 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/requestedFoods', logger, async (req, res) => {
+        app.post('/requestedFoods',verifyToken, logger, async (req, res) => {
             const food = req.body;
             const result = await requestCollection.insertOne(food)
             res.send(result)
